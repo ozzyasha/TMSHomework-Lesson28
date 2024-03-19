@@ -1,7 +1,6 @@
 import Foundation
 
 var lock = NSLock()
-var threadLock = NSLock()
 
 class BankAccount {
     var currentBalance: Decimal = 0
@@ -9,7 +8,7 @@ class BankAccount {
     func deposit(_ value: Decimal) {
         lock.lock()
         currentBalance += value
-        print("Пополнение счёта на сумму \(value). Текущий баланс: \(account.currentBalance)")
+        print("Пополнение счёта на сумму \(value). Текущий баланс: \(currentBalance)")
         lock.unlock()
     }
 
@@ -17,7 +16,7 @@ class BankAccount {
         lock.lock()
         if value <= currentBalance {
             currentBalance -= value
-            print("Снятие со счёта суммы \(value). Текущий баланс: \(account.currentBalance)")
+            print("Снятие со счёта суммы \(value). Текущий баланс: \(currentBalance)")
         } else {
             print("Не удалось снять сумму \(value). Недостаточно средств")
         }
@@ -27,59 +26,20 @@ class BankAccount {
 
 let account = BankAccount()
 
-let withdrawThread = Thread {
-    threadLock.lock()
-    account.withdraw(550.20)
-    account.withdraw(100.30)
-    threadLock.unlock()
-}
+let group = DispatchGroup()
 
-let depositThread = Thread {
-    threadLock.lock()
-    account.deposit(2000.50)
-    account.deposit(1000)
-    threadLock.unlock()
-}
-
-depositThread.start()
-withdrawThread.start()
-
-// MARK: - Вариант с использованием GCD
-
-class BankAccountGCD {
-    var currentBalance: Decimal = 0
-
-    func deposit(_ value: Decimal) {
-        currentBalance += value
-        print("Пополнение счёта на сумму \(value). Текущий баланс: \(accountGCD.currentBalance)")
-    }
-
-    func withdraw(_ value: Decimal) {
-        if value <= currentBalance {
-            currentBalance -= value
-            print("Снятие со счёта суммы \(value). Текущий баланс: \(accountGCD.currentBalance)")
-        } else {
-            print("Не удалось снять сумму \(value). Недостаточно средств")
-        }
+DispatchQueue.global().async(group: group) {
+    for _ in 1 ... 10000 {
+        account.deposit(1)
     }
 }
 
-let accountGCD = BankAccountGCD()
-
-let withdrawalQueue = DispatchQueue(label: "com.example.withdrawalQueue")
-let depositQueue = DispatchQueue(label: "com.example.depositQueue")
-
-DispatchQueue.global().sync {
-    print("---- GCD вариант ----")
+DispatchQueue.global().async(group: group) {
+    for _ in 1 ... 10000 {
+        account.deposit(1)
+    }
 }
 
-depositQueue.sync {
-    accountGCD.deposit(200)
-    accountGCD.deposit(300)
+group.notify(queue: DispatchQueue.global()) {
+    print(account.currentBalance)
 }
-
-withdrawalQueue.sync {
-    accountGCD.withdraw(600)
-    accountGCD.withdraw(500)
-}
-
